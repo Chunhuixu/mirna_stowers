@@ -50,7 +50,7 @@ def directory_structure(ori_samplefolder, outputpath):
                 print("Work folder: \n"+new_samplefolder+ "\n is exsisting..")
             else:
                 os.makedirs(new_samplefolder)
-                shutil.copy(file,new_samplefolder+'/'+samplename+sampleext)
+                shutil.copy(samplename_copy_use,new_samplefolder+'/'+samplename+'.fastq')
                 path.append(new_samplefolder)
                 print("Work folder: \n"+ new_samplefolder+'\n will be created and fastq files will be copy to..')
     print("# The work folder will be: \n" + outputpath)
