@@ -27,6 +27,7 @@ def directory_structure(ori_samplefolder, outputpath):
     global path
     path = []
     for file in os.listdir(ori_samplefolder):
+        
         if file.endswith(".fastq"):
             samplename = os.path.splitext(file)[0]
             sampleext = os.path.splitext(file)[1]
@@ -40,7 +41,8 @@ def directory_structure(ori_samplefolder, outputpath):
                 shutil.copy(file,new_samplefolder+'/'+samplename+sampleext)
                 path.append(new_samplefolder)
                 print("Work folder: \n"+ new_samplefolder+'\n will be created and fastq files will be copy to..')
-               elif file.endswith(".gz"):  #test.fastq.gz
+
+        elif file.endswith(".gz"):  #test.fastq.gz
             subprocess.call(["gunzip "+file], shell=True) #test.fastq
             samplename = os.path.splitext(file)[0]  #test.fastq
             samplename_copy_use = samplename
