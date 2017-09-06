@@ -1,0 +1,239 @@
+---
+title: "MicroRNA-Seq Summary Report"
+
+output: html_document
+---
+
+
+```{r setup, echo=FALSE, message=FALSE, results="hide"}
+library(grid)
+library(ggplot2)
+library(knitr)
+library(gridExtra)
+library(reshape2)
+library(corrplot)
+library(pcaPP)
+library(pheatmap)
+library(hwriter)
+library(RColorBrewer)
+```
+
+## Objective
+To quantify the MicroRNA expression and correlation among the given samples   
+
+## Data
+#### Samples
+```{r slist,echo=FALSE, message=FALSE}
+slist=scan("samplelist.txt",character(0),sep = "\n")
+cat(slist,sep = '\n')
+```
+
+#### Genome
+```{r glist, echo=FALSE, message=FALSE}
+glist=scan("ref.txt",character(0),sep = "\n")
+cat(glist,sep = '\n')
+```
+
+### Overall Mapping Results
+```{r mirna_align,echo=FALSE, message=FALSE, fig.height=15, fig.width=20}
+align_stats = read.csv('alignment_stats.csv')
+meltdata = melt(align_stats,variable.name='variable')
+mirnaalign = subset(meltdata,(variable =='Total.Reads.greater.15bp'| variable == 'Aligned.Reads.Post.Filter' | variable == 'Total.miRNA.reads'))
+colnames(mirnaalign)[1]='Samples'
+colnames(mirnaalign)[7]='Read_counts'
+g<-ggplot(mirnaalign, aes(x=Samples, y=Read_counts, fill=variable)) + 
+  geom_bar(stat='identity',position='dodge')+ 
+  scale_fill_brewer("Samples", palette="Set2")+
+  theme_bw()+
+  theme(strip.background = element_rect(fill = 'NA', colour = 'NA'),text=element_text(size=25),axis.text.x = element_text(angle = 45, hjust = 1,color = 'black'), axis.text.y = element_text(color = 'black'),legend.key.height = unit(2,"line"))+labs(x="Samples", y = "Read Counts")
+ggsave('mirna_align.png',g,width = 18, height = 9, dpi = 200) 
+g
+
+```
+
+
+
+Read length distribution of total miRNA for all samples, any length reads less than 1% of the sample reads will be removed.   
+
+```{r read_len,echo=FALSE, message=FALSE, fig.height=15, fig.width=20}
+align_stats = read.csv('merged_taglen_table.csv')
+total_mirna = align_stats[,c(1,2,31)]
+total_mirna = total_mirna[total_mirna$total>0,]
+colnames(total_mirna)[3]='Read_Percentage'
+colnames(total_mirna)[2]='Tag_length'
+mi=min(total_mirna$Read_Percentage)
+ma=max(total_mirna$Read_Percentage)
+total_mirna_greater1 = total_mirna[total_mirna$Read_Percentage>1,]
+
+ma=max(total_mirna[,3])
+#g<-ggplot(total_mirna, aes(x=Tag_length, y=Read_Percentage, fill=sample))+
+#  geom_bar(stat='identity',position = 'dodge')+
+#  scale_fill_brewer("Samples", palette="Set2")+
+#  ggtitle('Reads length distribution summary for all samples')+
+#  labs(x="Read Tag Length (bp)",y="Rread Counts Percentage")+
+#  theme_bw()+
+#  theme(strip.background = element_rect(fill = 'NA', colour = 'NA'),text=element_text(size=25),
+#        axis.text.x = element_text(hjust = 1,color = 'black'), axis.text.y = element_text(color = 'black'),legend.key.height =unit(2,"line"))
+#ggsave('all_sample_lentag_distribution.png',g,width = 18, height = 9, dpi = 200)
+#g
+cat('\n')
+
+g<-ggplot(total_mirna_greater1, aes(x=Tag_length, y=Read_Percentage, fill=sample))+
+  geom_bar(stat='identity',position = 'dodge')+
+  scale_fill_brewer("Samples", palette="Set2")+
+  ggtitle('Reads Length Distribution(>1% percentage)')+
+  labs(x="Read Tag Length (bp)",y="Rread Counts Percentage")+
+  theme_bw()+
+  theme(strip.background = element_rect(fill = 'NA', colour = 'NA'),text=element_text(size=25),
+        axis.text.x = element_text(hjust = 1,color = 'black'), axis.text.y = element_text(color = 'black'),legend.key.height =unit(2,"line"))
+g <-g + scale_y_continuous(breaks = c(0,10,20,30,40,50,60),labels = c( '1','10','20','30','40','50','60'))
+g
+ggsave('all_sample_lentag_distribution_1.png',g,width = 18, height = 9, dpi = 200)
+```
+   
+### Detected miRNA Counts 
+Show the distribution of detected annotataion of reads 
+* Any miRNA detected in sample will be counted to green bar
+* miRNA detected in sample with at least 10 reads will be counted to orange bar
+```{r mirna_summary,echo=FALSE, message=FALSE, fig.height=15, fig.width=20}
+align_stats = read.csv('alignment_stats.csv')
+meltdata = melt(align_stats,variable.name='variable')
+detected_mirna = subset(meltdata,(variable =='detected.miRNA'| variable == 'detected.miRNA.Covered.by.10.Reads'))
+colnames(detected_mirna)[1]='samples'
+colnames(detected_mirna)[7]='read_counts'
+g<-ggplot(detected_mirna, aes(x=samples, y=read_counts, fill=variable)) + 
+  geom_bar(stat='identity',position='dodge')+ 
+  scale_fill_brewer("Samples", palette="Set2")+
+  theme_bw()+
+  theme(strip.background = element_rect(fill = 'NA', colour = 'NA'),text=element_text(size=25),axis.text.x = element_text(angle = 45, hjust = 1,color = 'black'), axis.text.y = element_text(color = 'black'),legend.key.height = unit(2,"line"))+labs(x="Samples", y = "Number of Detected miRNA")
+ggsave('detected_mirnacounts.png',g,width = 18, height = 9, dpi = 200) 
+g
+
+```
+   
+   
+      
+### Small RNA Distribution Results
+#####Show the distribution of detected annotataion of reads    
+
+* __snoRNA__: number of reads that map to known snoRNAs. The list of snoRNAs is extracted from UCSC knownGenes and kgXref where geneSymbol is in the form "SNOR*" or the description contains the string " small nucleolar RNA".
+
+* __tRNA; rRNA; snRNA; scRNA; srpRNA__: number of reads that map to regions as listed by UCSC Genome Browser's RepeatMasker with the given repeat_class
+
+* __Other RepeatMasker RNAs__: number of reads that map to regions as listed by UCSC Genome Browser's RepeatMasker with the repeat_class "RNA"
+
+* __Coding Exon__: number of reads that map to the exon and intron regions of UCSC knownGenes
+
+
+```{r mirna_species,echo=FALSE, message=FALSE, fig.height=5, fig.width=15}
+align_stats = read.csv('alignment_stats.csv')
+meltdata = melt(align_stats,variable.name='variable')
+percentage_all_type = subset(meltdata,(variable == 'snoRNA' | variable=='tRNA'| variable =='rRNA' |  variable=='snRNA' | variable=='scRNA' | variable=='srpRNA' | variable=='Other.RepeatMasker.RNAs' | variable=='Coding.Exon' | variable =='Total.miRNA' ))  
+colnames(percentage_all_type)[1]='samples'
+colnames(percentage_all_type)[7]='percentage'
+g<-ggplot(percentage_all_type, aes(x=samples, y=percentage, fill=variable)) + geom_bar(stat='identity',position = position_fill(reverse = TRUE))+ scale_fill_brewer("Metric", palette="Set3") + guides(fill = guide_legend(reverse= TRUE))+coord_flip()+theme_bw()+
+   labs(x="Samples",y="Percentage in Total Reads")+
+   scale_y_continuous(labels = scales::percent)+
+  theme(strip.background = element_rect(fill = 'NA', colour = 'NA'),text=element_text(size=25),
+        axis.text.x = element_text(hjust = 1,color = 'black'), axis.text.y = element_text(color = 'black'),legend.key.height =unit(2,"line"))
+g
+```
+
+   
+   
+   
+### MicroRNA distribution results
+#####Show miRNA sub-type distribution   
+
+* __miRNA loop__: number of reads that do not align to the mature strand, but align to the 5 bases after the mature strand, where the loop between the mature strand and * strand would be.
+
+* __unannotated miRNA__: number of reads that align to the region of the precursor miRNA that would appear to be on the opposite side of the mature strand, but miRBase does not have the star strand annotation. Therefore these reads cannot be annotated as star strand since there is no information regarding which part of the precursor miRNA would be the * strand.
+
+* __precursor miRNA__: number of reads that either 1. do not map to the mature strand, but map to the region between the end of the mature strand and the end of the precursor miRNA, or 2. do not map to the star star strand, but map to the region between the end of the star strand and the end of the precursor miRNA
+
+* __crossmapped miRNA__: number of reads that align to crossmapped miRNAs, regardless of whether the read itself is crossmapped. A crossmapped miRNA has reads that perfectly to more than 1 miRNA species, regardless of location within the miRNA. These reads are not counted in the mature, star, precursor, loop and unannotated miRNA numbers. 
+
+* __mature miRNA__: number of reads mapped to the mature strand of miRNAs
+
+* __star miRNA__: number of reads mapped to the star strand of miRNAs
+
+
+```{r mirna_type,echo=FALSE, message=FALSE, fig.height=5, fig.width=15}
+align_stats = read.csv('alignment_stats.csv')
+meltdata = melt(align_stats,variable.name='variable')
+percentage_mirna_type = subset(meltdata, (variable == 'Crossmapped.miRNA' | variable == 'mature.miRNA' | variable=='miRNA'| variable =='precursor.miRNA' |  variable=='miRNA.loop' | variable=='unannotated.miRNA' | variable=='star.miRNA'))  
+percentage_mirna_type$variable = factor(percentage_mirna_type$variable,levels=c('mature.miRNA','Crossmapped.miRNA','star.miRNA','precursor.miRNA','unannotated.miRNA','miRNA.loop'))
+colnames(percentage_mirna_type)[1]='samples'
+colnames(percentage_mirna_type)[7]='percentage'
+
+g<-ggplot(percentage_mirna_type, aes(x=samples, y=percentage, fill=variable)) + geom_bar(stat='identity',position = position_fill(reverse = TRUE))+ scale_fill_brewer("Metric", palette="Set2") + guides(fill = guide_legend(reverse= TRUE))+ coord_flip()+theme_bw()+
+    labs(x="Samples",y="Percentage in Total miRNA Reads")+
+     scale_y_continuous(labels = scales::percent)+
+  theme(strip.background = element_rect(fill = 'NA', colour = 'NA'),text=element_text(size=25),
+        axis.text.x = element_text(hjust = 1,color = 'black'), axis.text.y = element_text(color = 'black'),legend.key.height =unit(2,"line"))
+g
+```
+
+### Correlation Results
+* __Spearman Correlation__ based on Log2 transformation of RPM expression
+
+* The first heatmap is drawn without clustering. The samples are ordered based on lims information.
+
+* The second heatmap has been hierarchically clustered based on Euclidean distance between samples. The samples has been reordered
+to reflect the tree structure.
+
+```{r cor,echo=FALSE, message=FALSE, fig.height=12, fig.width=12}
+counts = read.table('miRNA_expr_RPM_plus_1_log2_matrix.txt', sep="\t", head=TRUE)
+y = ncol(counts)
+expr_cor_matrix_nor = cor(counts[,2:y]) #need to be fixed as Y!!!!!!!!!!1
+pheatmap(expr_cor_matrix_nor, main="Correlation Heatmap", fontsize = 20,border_color=NA, cluster_cols=F, cluster_rows=F, color = colorRampPalette(rev(brewer.pal(n = 11, name ="RdBu")))(100))
+```
+
+
+
+```{r cor-cluster,echo=FALSE, message=FALSE, fig.height=12, fig.width=12}
+counts = read.table('miRNA_expr_RPM_plus_1_log2_matrix.txt', sep="\t", head=TRUE)
+y = ncol(counts)
+expr_cor_matrix_nor = cor(counts[,2:y]) #need to be fixed as Y!!!!!!!!!!1
+pheatmap(expr_cor_matrix_nor, main="Correlation Heatmap with Clustering Order", fontsize = 20,border_color=NA,color = colorRampPalette(rev(brewer.pal(n = 11, name ="RdBu")))(100))
+```
+
+
+##Result files
+####miRNA expression matrix   
+  [miRNA_expn_raw_matrix.txt](miRNA_expr_raw_matrix.txt)   
+  [miRNA_expn_RPM_matrix.txt](miRNA_expr_RPM_matrix.txt)    
+  [miRNA_expn_RPM_plus_1_Log2_matrix.txt](miRNA_expr_RPM_plus_1_log2_matrix.txt)   
+  
+####Expression of annotation types and sub-type miRNA tables  
+  [miRNA_summary_table.txt](miRNA_summary_table.txt)  
+  [feature_summary_table.txt](feature_summary_table.txt)  
+
+
+
+## Methods
+
+#### Alignments   
+* By using BWA(__Version: 0.7.15-r1140__), all trimmed fastq files will be aligned to the given reference genome   
+  
+  /bwa aln -t 3 ref.fa sample.fastq > sample.sai   
+  /bwa samse -n 10 ref.fa sample.sai sample.fa > sample.sam   
+
+* Convert the .sam file to a .bam file by using Samtools (__Version: 1.3.1__)   
+  /samtools sort sample.bam -o sample.sorted.bam   
+  /samtools index sample.sorted.bam   
+
+#### TCGA microRNA Pipeline 
+* By using TCGA microRNA pipeline line(__Version:0.2.7__), the sam file will be annotated based on MirBase database(__Version 21a__) and UCSC species database
+
+#### reference
+[Chu, Andy, et al. "Large-scale profiling of microRNAs for the cancer genome atlas." Nucleic acids research 44.1 (2016): e3-e3.](https://academic.oup.com/nar/article/44/1/e3/2499678/Large-scale-profiling-of-microRNAs-for-The-Cancer)   
+The pipeline is available at:
+[https://github.com/bcgsc/mirna](https://github.com/bcgsc/mirna)
+
+
+
+
+``` {r session_info, echo=FALSE, comment=NA}
+sessionInfo()
+```
