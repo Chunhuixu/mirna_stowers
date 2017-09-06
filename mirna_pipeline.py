@@ -39,8 +39,9 @@ def directory_structure(ori_samplefolder, outputpath):
                 path.append(new_samplefolder)
                 print("Work folder: \n"+ new_samplefolder+'\n will be created and fastq files will be copy to..')
         elif file.endswith(".gz"):
-            subprocess.call(["gunzip *.gz"], shell=True)
+            subprocess.call(["gunzip "+file], shell=True)
             samplename = os.path.splitext(file)[0]
+            samplename_copy_use = os.path.split(file)[0]
             sampleext = os.path.splitext(file)[1]
             samplename = samplename.replace('_', '')
             new_samplefolder = os.path.join(outputpath,samplename)
