@@ -1,3 +1,5 @@
+#V9
+#fixed the bug when the sample file is *.fastq.gz format
 #v8
 #none-align to noalign,delete none-annotation
 #change 'expn' to 'expr'
