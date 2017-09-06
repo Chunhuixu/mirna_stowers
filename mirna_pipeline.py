@@ -40,10 +40,11 @@ def directory_structure(ori_samplefolder, outputpath):
                 shutil.copy(file,new_samplefolder+'/'+samplename+sampleext)
                 path.append(new_samplefolder)
                 print("Work folder: \n"+ new_samplefolder+'\n will be created and fastq files will be copy to..')
-        elif file.endswith(".gz"):
-            subprocess.call(["gunzip "+file], shell=True)
-            samplename = os.path.splitext(file)[0]
-            samplename_copy_use = os.path.split(file)[0]
+               elif file.endswith(".gz"):  #test.fastq.gz
+            subprocess.call(["gunzip "+file], shell=True) #test.fastq
+            samplename = os.path.splitext(file)[0]  #test.fastq
+            samplename_copy_use = samplename
+            samplename = os.path.splitext(samplename)[0]
             sampleext = os.path.splitext(file)[1]
             samplename = samplename.replace('_', '')
             new_samplefolder = os.path.join(outputpath,samplename)
@@ -56,7 +57,6 @@ def directory_structure(ori_samplefolder, outputpath):
                 path.append(new_samplefolder)
                 print("Work folder: \n"+ new_samplefolder+'\n will be created and fastq files will be copy to..')
     print("# The work folder will be: \n" + outputpath)
-
 
 def parameters(spe,outputpath):
     species = None
